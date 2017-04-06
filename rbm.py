@@ -88,8 +88,7 @@ class RBM:
                 neg_hidden_bias_activation = np.sum(neg_hid_prob, axis=0)
 
                 # Update the weights and biases
-                self.delta_weights = momentum * self.delta_weights + self.learning_rate * (
-                    (pos_products - neg_products) / batch_size - weight_cost * self.weights)
+                self.delta_weights = momentum * self.delta_weights + self.learning_rate * ((pos_products - neg_products) / batch_size - weight_cost * self.weights)
                 self.delta_vbias = (momentum * self.delta_vbias + (
                     pos_visible_bias_activation - neg_visibe_bias_activation)) * (self.learning_rate / batch_size)
                 self.delta_hbias = (momentum * self.delta_hbias + (
