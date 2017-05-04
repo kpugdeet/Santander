@@ -2,17 +2,22 @@ import csv
 import numpy as np
 import pickle
 import os
-from RbmTf import RBM
+from RbmTF import RBM
 import time
+import sys
 
 # System Argument
-fromDate = "2016-02-28"
+fromDate = "2015-01-28"
 toDate = "2016-04-28"
-targetDate = "2016-04-28"
-evalDate = "2016-05-28"
+targetDate = "2016-05-28"
+evalDate = "2016-06-28"
+# fromDate = sys.argv[1]
+# toDate = sys.argv[2]
+# targetDate = sys.argv[3]
+# evalDate = sys.argv[4]
 threshold = 0.00
 limit = 7
-select = "/cpu:0"
+select = "/gpu:0"
 
 # Print option for numpy
 np.set_printoptions(suppress=True)
@@ -20,6 +25,10 @@ np.set_printoptions(suppress=True)
 # User preference and its index
 userID = dict()
 user = []
+
+# User preference and its index
+userIDPref = dict()
+userPref = []
 
 # User preference ad its index for checking to predict
 userIDTarget = dict()
@@ -38,6 +47,7 @@ else:
         readCSV = csv.reader(csvFile, delimiter=',')
         next(readCSV, None)
         count = 0
+        countPref = 0
         countTarget = 0
         countEvaluation = 0
         for i, row in enumerate(readCSV):
@@ -49,9 +59,19 @@ else:
                         if user[index][_] == 0 and x != "NA":
                             user[index][_] = x
                 else:
-                    userID[checkID] = count
                     user.append(['0' if x == "NA" else x for x in row[24:]])
+                    userID[checkID] = count
                     count += 1
+                # For cumulative preference
+                if checkID in userIDPref:
+                    index = userIDPref[checkID]
+                    for _, x in enumerate(row[24:]):
+                        if userPref[index][_] == 0 and x != "NA":
+                            userPref[index][_] = x
+                else:
+                    userPref.append(['0' if x == "NA" else x for x in row[24:]])
+                    userIDPref[checkID] = countPref
+                    countPref += 1
             if row[0] == targetDate:
                 checkID = row[1].strip()
                 userIDTarget[checkID] = countTarget
@@ -64,6 +84,7 @@ else:
                 countEvaluation += 1
 
         user = np.array(user).astype(np.float)
+        userPref = np.array(userPref).astype(np.float)
         userTarget = np.array(userTarget).astype(np.float)
         userEval = np.array(userEval).astype(np.float)
         # pickle.dump(user, open("user.pkl", "wb"))
@@ -71,6 +92,7 @@ else:
 
 # Check the input Data is correct
 print (user.shape, len(userID))
+print (userPref.shape, len(userIDPref))
 print (userTarget.shape, len(userIDTarget))
 print (userEval.shape, len(userIDEval))
 label, indices = np.unique(user,return_inverse=True)
@@ -83,7 +105,7 @@ print (user.shape[0]*user.shape[1]) == np.sum(count)
 rbm = RBM (user.shape[1], user.shape[1]/2, ["w", "vb", "hb", "dW", "dVb", "dHb"], "./logs", select)
 startTime = time.time()
 rbm.fit(user, 100)
-rbm.saveWeights("./model.ckpt")
+# rbm.saveWeights("./model.ckpt")
 # rbm.restoreWeights("./model.ckpt")
 print ("Time used: {0}".format(time.time()-startTime))
 
@@ -95,7 +117,11 @@ with open("./data/test_ver2.csv") as csvFile:
     next(readCSV, None)
     count = 0
     for i, row in enumerate(readCSV):
-        if row[1].strip() in userIDTarget:
+        if row[1].strip() in userIDPref and row[1].strip() in userIDTarget:
+            # test.append(userTarget[userIDTarget[row[1].strip()]])
+            test.append(np.logical_or(userTarget[userIDTarget[row[1].strip()]], userPref[userIDPref[row[1].strip()]]).astype(np.float))
+            testID.append(row[1].strip())
+        elif row[1].strip() in userIDTarget:
             test.append(userTarget[userIDTarget[row[1].strip()]])
             testID.append(row[1].strip())
     test = np.array(test).astype(np.float)
@@ -136,29 +162,30 @@ print countEmpty
 # Evaluation
 countCorrect = []
 for key, value in submission.iteritems():
-    evalIndex = userIDEval[key]
-    targetIndex = userIDTarget[key]
-    relevantNodes = 0
-    predictNodes = len(value)
-    tmpAP = 0.0
-    # Loop for counting relevant nodes
-    for _, status in enumerate(userEval[evalIndex]):
-        if status == 1 and userTarget[targetIndex][_] == 0:
-            relevantNodes += 1
-    # Calculate AP@Limit
-    correctIndex = 1.0
-    for _, index in enumerate(value):
-        if userEval[evalIndex][index] == 1:
-            tmpAP += (correctIndex/(_+1))
-            correctIndex += 1
-    # Append the AP to list to calculate MAP
-    if min(relevantNodes, predictNodes) == 0:
-        countCorrect.append(0.0)
-    else:
-        tmpAP /= min(relevantNodes, predictNodes)
-        countCorrect.append(tmpAP)
+    if key in userIDEval:
+        evalIndex = userIDEval[key]
+        targetIndex = userIDTarget[key]
+        relevantNodes = 0
+        predictNodes = len(value)
+        tmpAP = 0.0
+        # Loop for counting relevant nodes
+        for _, status in enumerate(userEval[evalIndex]):
+            if status == 1 and userTarget[targetIndex][_] == 0:
+                relevantNodes += 1
+        # Calculate AP@Limit
+        correctIndex = 1.0
+        for _, index in enumerate(value):
+            if userEval[evalIndex][index] == 1:
+                tmpAP += (correctIndex/(_+1))
+                correctIndex += 1
+        # Append the AP to list to calculate MAP
+        if min(relevantNodes, predictNodes) == 0:
+            countCorrect.append(0.0)
+        else:
+            tmpAP /= min(relevantNodes, predictNodes)
+            countCorrect.append(tmpAP)
 
-print countCorrect[0]
 countCorrect = np.array(countCorrect)
-print np.mean(countCorrect)
+print (fromDate, toDate, targetDate, evalDate, np.mean(countCorrect), len(testID))
+# print np.mean(countCorrect)
 

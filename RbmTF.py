@@ -13,6 +13,7 @@ class RBM:
             self.learningRate = learningRate
             self.weightDecay = weightDecay
             self.momentum = momentum
+            self.path = path
 
             # Weight for save and restore Tensorflow
             self.weights = self.initialWeight()
@@ -87,16 +88,15 @@ class RBM:
             self.errSum = tf.reduce_mean(tf.square(self.x - self.vSample))
             tf.summary.scalar("Error Sum", self.errSum)
 
-            # Initial session
-            self.init = tf.global_variables_initializer()
-            # self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
-            self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
-            # self.sess = tf.Session()
-            self.sess.run(self.init)
+            # # Initial session
+            # self.init = tf.global_variables_initializer()
+            # # self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+            # self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+            # # self.sess = tf.Session()
+            # self.sess.run(self.init)
 
             # For Tensorboard
             self.merge = tf.summary.merge_all()
-            self.write = tf.summary.FileWriter(path, self.sess.graph)
 
     def initialWeight(self):
         # These weights are only for storing and loading model for Tensorflow Saver.
@@ -118,23 +118,24 @@ class RBM:
     def sampleThreshold(self, probs, cutoff):
         return tf.nn.relu(tf.sign(probs - cutoff))
 
-    def fit(self, x, epoch):
+    def fit(self, x, epoch, sess):
+        write = tf.summary.FileWriter(self.path, sess.graph)
         for _ in range(epoch):
-            summary, tmp1, tmp2 = self.sess.run([self.merge, self.errSum, self.updateAll], feed_dict={self.x: x})
-            self.write.add_summary(summary, _)
+            summary, tmp1, tmp2 = sess.run([self.merge, self.errSum, self.updateAll], feed_dict={self.x: x})
+            write.add_summary(summary, _)
 
     def predictH(self, x):
         return self.sess.run(self.hSample, {self.x: x})
 
-    def predictV(self, x):
-        return self.sess.run(self.vSample, {self.x: x})
+    def predictV(self, x, sess):
+        return sess.run(self.vSample, {self.x: x})
 
     def predictVWithThreshold(self, x, cutoff):
         vSampleThreshold = self.sampleThreshold(self.vSample, cutoff)
         return self.sess.run(vSampleThreshold, {self.x: x})
 
-    def getWeight(self):
-        return self.sess.run(self.w)
+    def getWeight(self, sess):
+        return sess.run(self.w)
 
     def restoreWeights(self, path):
         saver = tf.train.Saver({self.names[0]: self.weights["w"],
@@ -172,7 +173,7 @@ if __name__ == '__main__':
     rbm = RBM (6, 2, ["w", "vb", "hb", "dW", "dVb", "dHb"], "./logs")
     np.set_printoptions(suppress=True)
     rbm.fit(data, 100)
-    rbm.saveWeights("./model.ckpt")
+    # rbm.saveWeights("./model.ckpt")
     # rbm.restoreWeights("./model.ckpt")
     print rbm.predictH(np.array([[0, 0, 0, 1, 1, 0]]))
     print rbm.predictV(np.array([[0, 0, 0, 1, 1, 0]]))
