@@ -27,7 +27,7 @@ import csv
 import numpy as np
 import pickle
 import os
-from RbmTF import RBM
+from RbmTFSession import RBM
 import time
 import tensorflow as tf
 import sys

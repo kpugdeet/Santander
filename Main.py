@@ -17,7 +17,7 @@ evalDate = "2016-06-28"
 # evalDate = sys.argv[4]
 threshold = 0.00
 limit = 7
-select = "/gpu:0"
+select = "/cpu:0"
 
 # Print option for numpy
 np.set_printoptions(suppress=True)
@@ -39,9 +39,9 @@ userIDEval = dict()
 userEval = []
 
 # Read csv file
-if os.path.isfile("user.pkl") and os.path.isfile("userID.pkl"):
-    user = pickle.load(open("user.pkl", "rb"))
-    userID = pickle.load(open("userID.pkl", "rb"))
+if os.path.isfile("./model/user.pkl") and os.path.isfile("./model/userID.pkl"):
+    user = pickle.load(open("./model/user.pkl", "rb"))
+    userID = pickle.load(open("./model/userID.pkl", "rb"))
 else:
     with open("./data/train_ver2.csv") as csvFile:
         readCSV = csv.reader(csvFile, delimiter=',')
@@ -53,15 +53,15 @@ else:
         for i, row in enumerate(readCSV):
             if fromDate <= row[0] <= toDate:
                 checkID = row[1].strip()
-                if checkID in userID:
-                    index = userID[checkID]
-                    for _, x in enumerate(row[24:]):
-                        if user[index][_] == 0 and x != "NA":
-                            user[index][_] = x
-                else:
-                    user.append(['0' if x == "NA" else x for x in row[24:]])
-                    userID[checkID] = count
-                    count += 1
+                # if checkID in userID:
+                #     index = userID[checkID]
+                #     for _, x in enumerate(row[24:]):
+                #         if user[index][_] == 0 and x != "NA":
+                #             user[index][_] = x
+                # else:
+                user.append(['0' if x == "NA" else x for x in row[24:]])
+                userID[checkID] = count
+                count += 1
                 # For cumulative preference
                 if checkID in userIDPref:
                     index = userIDPref[checkID]
@@ -87,24 +87,24 @@ else:
         userPref = np.array(userPref).astype(np.float)
         userTarget = np.array(userTarget).astype(np.float)
         userEval = np.array(userEval).astype(np.float)
-        # pickle.dump(user, open("user.pkl", "wb"))
-        # pickle.dump(userID, open("userID.pkl", "wb"))
+        # pickle.dump(user, open("./model/user.pkl", "wb"))
+        # pickle.dump(userID, open("./model/userID.pkl", "wb"))
 
 # Check the input Data is correct
 print (user.shape, len(userID))
-print (userPref.shape, len(userIDPref))
-print (userTarget.shape, len(userIDTarget))
-print (userEval.shape, len(userIDEval))
-label, indices = np.unique(user,return_inverse=True)
-count = np.bincount(indices)
-print (label, count)
-print (float(count[0]/float(count[1])))
-print (user.shape[0]*user.shape[1]) == np.sum(count)
+# print (userPref.shape, len(userIDPref))
+# print (userTarget.shape, len(userIDTarget))
+# print (userEval.shape, len(userIDEval))
+# label, indices = np.unique(user,return_inverse=True)
+# count = np.bincount(indices)
+# print (label, count)
+# print (float(count[0]/float(count[1])))
+# print (user.shape[0]*user.shape[1]) == np.sum(count)
 
 # Training RBM
-rbm = RBM (user.shape[1], user.shape[1]/2, ["w", "vb", "hb", "dW", "dVb", "dHb"], "./logs", select)
+rbm = RBM (user.shape[1], user.shape[1]/2, ["w", "vb", "hb", "dW", "dVb", "dHb"], "./logs/rbm", typeRun=select, learningRate=0.5)
 startTime = time.time()
-rbm.fit(user, 100)
+rbm.fit(user, 50)
 # rbm.saveWeights("./model.ckpt")
 # rbm.restoreWeights("./model.ckpt")
 print ("Time used: {0}".format(time.time()-startTime))

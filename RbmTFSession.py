@@ -89,19 +89,19 @@ class RBM:
             self.errSum = tf.reduce_mean(tf.square(self.x - self.vSample))
             tf.summary.scalar("Error Sum", self.errSum)
 
-            # Initial session
-            self.init = tf.global_variables_initializer()
-            self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
-            self.sess.run(self.init)
-
-            # For Tensorboard
+            # # Initial session
+            # self.init = tf.global_variables_initializer()
+            # self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+            # self.sess.run(self.init)
+            #
+            # # For Tensorboard
             self.merge = tf.summary.merge_all()
-            if tf.gfile.Exists(self.path):
-                tf.gfile.DeleteRecursively(self.path)
-                tf.gfile.MkDir(self.path)
-            else:
-                tf.gfile.MakeDirs(self.path)
-            self.write = tf.summary.FileWriter(self.path, self.sess.graph)
+            # if tf.gfile.Exists(self.path):
+            #     tf.gfile.DeleteRecursively(self.path)
+            #     tf.gfile.MkDir(self.path)
+            # else:
+            #     tf.gfile.MakeDirs(self.path)
+            # self.write = tf.summary.FileWriter(self.path, self.sess.graph)
 
     def initialWeight(self):
         # These weights are only for storing and loading model for Tensorflow Saver.
@@ -123,16 +123,16 @@ class RBM:
     def sampleThreshold(self, probs, cutoff):
         return tf.nn.relu(tf.sign(probs - cutoff))
 
-    def fit(self, x, epoch):
+    def fit(self, x, epoch, sess):
         for _ in range(epoch):
-            summary, tmp1, tmp2 = self.sess.run([self.merge, self.errSum, self.updateAll], feed_dict={self.x: x})
-            self.write.add_summary(summary, _)
+            summary, tmp1, tmp2 = sess.run([self.merge, self.errSum, self.updateAll], feed_dict={self.x: x})
+            # self.write.add_summary(summary, _)
 
     def predictH(self, x):
         return self.sess.run(self.hSample, {self.x: x})
 
-    def predictV(self, x):
-        return self.sess.run(self.vSample, {self.x: x})
+    def predictV(self, x, sess):
+        return sess.run(self.vSample, {self.x: x})
 
     def predictVSample(self, x):
         return self.sess.run(self.vSampleProbs, {self.x: x})
@@ -141,8 +141,8 @@ class RBM:
         vSampleThreshold = self.sampleThreshold(self.vSample, cutoff)
         return self.sess.run(vSampleThreshold, {self.x: x})
 
-    def getWeight(self):
-        return self.sess.run(self.w)
+    def getWeight(self, sess):
+        return sess.run(self.w)
 
     def restoreWeights(self, path):
         saver = tf.train.Saver({self.names[0]: self.weights["w"],
@@ -190,7 +190,10 @@ if __name__ == '__main__':
                      [0, 0, 0, 0, 0, 1]])
 
     rbm = RBM (6, 3, ["w", "vb", "hb", "dW", "dVb", "dHb"], "./logs/rbm", learningRate=0.01)
+    init = tf.global_variables_initializer()
+    sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+    sess.run(init)
     np.set_printoptions(suppress=True)
-    rbm.fit(data, 10000)
-    print rbm.getWeight()
-    print rbm.predictV(data)
+    rbm.fit(data, 100, sess)
+    print rbm.getWeight(sess)
+    print rbm.predictV(data, sess)
